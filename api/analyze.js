@@ -56,7 +56,7 @@ ${inputText}`
         'X-Title': 'Vaidya Plagiarism Detector',
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-r1:free',
+        model: 'openrouter/auto',
         messages: [{ role: 'user', content: fullPrompt }],
         max_tokens: 600,
         temperature: 0.1,
