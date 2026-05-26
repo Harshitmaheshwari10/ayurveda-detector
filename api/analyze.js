@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     try {
       const pageRes = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AyurvedaDetector/1.0)' },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(25000),
       })
       const html = await pageRes.text()
       inputText = html
@@ -48,7 +48,7 @@ Text: ${inputText} [/INST]`
 
   try {
     const apiRes = await fetch(
-      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+     'https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta',
       {
         method: 'POST',
         headers: {
