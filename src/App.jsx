@@ -89,44 +89,15 @@ Rules:
 Text to analyze: ${inputText} [/INST]`
 
     try {
-      const apiRes = await fetch(
-        'https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_HF_API_KEY}`,
-          },
-          body: JSON.stringify({
-            inputs: prompt,
-            parameters: { max_new_tokens: 400, temperature: 0.1, return_full_text: false },
-          }),
-        }
-      )
+      const apiRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tab === 'text' ? { text: input } : { url: input }),
+      })
 
       const data = await apiRes.json()
       if (!apiRes.ok) throw new Error(data.error || 'API error')
-
-      let raw = Array.isArray(data) ? data[0]?.generated_text || '' : data?.generated_text || ''
-      raw = raw.replace(/```json|```/g, '').trim()
-      const start = raw.indexOf('{')
-      const end = raw.lastIndexOf('}')
-
-      let parsed
-      if (start !== -1 && end !== -1) {
-        try { parsed = JSON.parse(raw.slice(start, end + 1)) } catch (e) { parsed = null }
-      }
-
-      if (!parsed) {
-        parsed = {
-          overall_risk: 'Medium', risk_score: 45,
-          verdict_summary: 'Analysis complete. Some sections may need manual citation review.',
-          findings: [], clean_sections: 'Unable to parse detailed findings.',
-          classical_refs_detected: [],
-        }
-      }
-
-      setResult(parsed)
+      setResult(data)
     } catch (e) {
       setError(e.message || 'Analysis failed. Please try again.')
     }
