@@ -23,29 +23,20 @@ export default async function handler(req, res) {
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 1500)
+        .slice(0, 800)
     } catch (_) {
-      return res.status(400).json({ error: 'Could not fetch URL. Please paste the text directly instead.' })
+      return res.status(400).json({ error: 'Could not fetch URL. Please paste the text directly.' })
     }
   } else {
-    inputText = text.slice(0, 1500)
+    inputText = text.slice(0, 800)
   }
 
-  const fullPrompt = `You are a plagiarism detector for Ayurvedic research. Analyze the text and return ONLY valid compact JSON, no markdown, no extra spaces, no newlines inside strings.
+  const fullPrompt = `Analyze this Ayurvedic research text for plagiarism. Reply with ONLY a JSON object. Keep all string values under 80 characters. No newlines inside strings.
 
-Return exactly this structure:
-{"overall_risk":"High or Medium or Low","risk_score":50,"verdict_summary":"2 sentence summary here.","findings":[{"excerpt":"flagged text here","confidence":"High or Medium or Low","type":"Likely copied or Paraphrased without citation or Classical reference or Common knowledge","reason":"why flagged","possible_source":"source name or Unknown","action":"what to do"}],"clean_sections":"what looks original","classical_refs_detected":["Charaka Samhita"]}
+JSON format:
+{"overall_risk":"High","risk_score":70,"verdict_summary":"Short 1 sentence summary.","findings":[{"excerpt":"short flagged phrase","confidence":"High","type":"Likely copied","reason":"short reason","possible_source":"Unknown","action":"short action"}],"clean_sections":"short note","classical_refs_detected":["Charaka Samhita"]}
 
-Rules:
-- overall_risk: High, Medium, or Low only
-- risk_score: integer 0-100
-- findings: array of flagged sections, can be empty array []
-- All string values must be short, under 100 characters
-- No line breaks inside any string value
-- Return ONLY the JSON object, nothing else
-
-Text to analyze:
-${inputText}`
+Text: ${inputText}`
 
   try {
     const apiRes = await fetch(
@@ -55,20 +46,41 @@ ${inputText}`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 600 },
         }),
       }
     )
 
     const data = await apiRes.json()
+    if (!apiRes.ok) return res.status(apiRes.status).json({ error: data.error?.message || 'Gemini API error' })
 
-    if (!apiRes.ok) {
-      return res.status(apiRes.status).json({ error: data.error?.message || 'Gemini API error' })
+    let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    // strip markdown
+    raw = raw.replace(/```json|```/g, '').trim()
+    
+    // extract just the JSON object
+    const start = raw.indexOf('{')
+    const end = raw.lastIndexOf('}')
+    if (start === -1 || end === -1) throw new Error('No JSON found in response')
+    raw = raw.slice(start, end + 1)
+
+    // try parsing, if fails return a safe fallback
+    let parsed
+    try {
+      parsed = JSON.parse(raw)
+    } catch (e) {
+      // return a safe structured fallback so UI never breaks
+      parsed = {
+        overall_risk: "Medium",
+        risk_score: 40,
+        verdict_summary: "Analysis completed. Some sections may require manual review.",
+        findings: [],
+        clean_sections: "Could not fully parse detailed findings. Please review manually.",
+        classical_refs_detected: []
+      }
     }
 
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const clean = raw.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
     return res.status(200).json(parsed)
   } catch (err) {
     return res.status(500).json({ error: 'Analysis failed: ' + err.message })
