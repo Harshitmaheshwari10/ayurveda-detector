@@ -56,7 +56,7 @@ ${inputText}`
         'X-Title': 'Vaidya Plagiarism Detector',
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-3.3-70b-instruct:free',
+        model: 'deepseek/deepseek-r1:free',
         messages: [{ role: 'user', content: fullPrompt }],
         max_tokens: 600,
         temperature: 0.1,
