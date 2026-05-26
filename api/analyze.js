@@ -73,7 +73,7 @@ Analyze this Ayurvedic research text for plagiarism signals:`
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: fullPrompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+          generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
         }),
       }
     )
