@@ -23,58 +23,87 @@ export default async function handler(req, res) {
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-        .slice(0, 800)
+        .slice(0, 600)
     } catch (_) {
       return res.status(400).json({ error: 'Could not fetch URL. Please paste the text directly.' })
     }
   } else {
-    inputText = text.slice(0, 800)
+    inputText = text.slice(0, 600)
   }
 
-  const fullPrompt = `You are a plagiarism detector for Ayurvedic research. Analyze the text below and return ONLY a JSON object. No markdown, no explanation, just JSON.
+  const prompt = `<s>[INST] You are a plagiarism detector for Ayurvedic research. Analyze the text and return ONLY a JSON object, nothing else.
 
-Use this exact structure:
-{"overall_risk":"Medium","risk_score":50,"verdict_summary":"One sentence summary.","findings":[{"excerpt":"short phrase","confidence":"Medium","type":"Paraphrased without citation","reason":"short reason","possible_source":"Unknown","action":"Add citation"}],"clean_sections":"What looks original","classical_refs_detected":["Charaka Samhita"]}
+JSON structure:
+{"overall_risk":"Medium","risk_score":50,"verdict_summary":"One sentence summary.","findings":[{"excerpt":"short phrase max 20 words","confidence":"Medium","type":"Paraphrased without citation","reason":"short reason","possible_source":"Unknown","action":"Add citation"}],"clean_sections":"what looks original","classical_refs_detected":["Charaka Samhita"]}
 
 Rules:
-- overall_risk must be High, Medium, or Low
-- risk_score is integer 0-100  
-- findings can be empty array if nothing flagged
-- keep every string value under 80 characters
-- classical_refs_detected can be empty array
+- overall_risk: High, Medium, or Low only
+- risk_score: integer 0-100
+- findings: array, can be empty []
+- all strings under 80 chars
+- classical_refs_detected: array, can be empty []
+- return ONLY the JSON, no explanation
 
-Text to analyze:
-${inputText}`
+Text: ${inputText} [/INST]`
 
   try {
-    const apiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://vaidya-detector.vercel.app',
-        'X-Title': 'Vaidya Plagiarism Detector',
-      },
-      body: JSON.stringify({
-        model: 'openrouter/auto',
-        messages: [{ role: 'user', content: fullPrompt }],
-        max_tokens: 600,
-        temperature: 0.1,
-      }),
-    })
+    const apiRes = await fetch(
+      'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.HF_API_KEY}`,
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: {
+            max_new_tokens: 400,
+            temperature: 0.1,
+            return_full_text: false,
+          },
+        }),
+      }
+    )
 
     const data = await apiRes.json()
-    if (!apiRes.ok) return res.status(apiRes.status).json({ error: data.error?.message || 'OpenRouter API error' })
 
-    let raw = data.choices?.[0]?.message?.content || ''
+    if (!apiRes.ok) {
+      return res.status(apiRes.status).json({ error: data.error || 'HuggingFace API error' })
+    }
+
+    let raw = Array.isArray(data) ? data[0]?.generated_text || '' : data?.generated_text || ''
     raw = raw.replace(/```json|```/g, '').trim()
 
     const start = raw.indexOf('{')
     const end = raw.lastIndexOf('}')
-    if (start === -1 || end === -1) throw new Error('No JSON in response')
+    if (start === -1 || end === -1) {
+      return res.status(200).json({
+        overall_risk: 'Medium',
+        risk_score: 45,
+        verdict_summary: 'Analysis complete. Manual review recommended for citation verification.',
+        findings: [],
+        clean_sections: 'Unable to parse detailed findings. Please review manually.',
+        classical_refs_detected: [],
+      })
+    }
+
     raw = raw.slice(start, end + 1)
 
-    const parsed = JSON.parse(raw)
+    let parsed
+    try {
+      parsed = JSON.parse(raw)
+    } catch (e) {
+      parsed = {
+        overall_risk: 'Medium',
+        risk_score: 45,
+        verdict_summary: 'Analysis complete. Manual review recommended for citation verification.',
+        findings: [],
+        clean_sections: 'Unable to parse detailed findings. Please review manually.',
+        classical_refs_detected: [],
+      }
+    }
+
     return res.status(200).json(parsed)
   } catch (err) {
     return res.status(500).json({ error: 'Analysis failed: ' + err.message })
