@@ -1,4 +1,4 @@
-
+import { useState } from 'react'
 
 const SAMPLE_TEXT = `Ashwagandha (Withania somnifera) is a well-known adaptogenic herb used in Ayurvedic medicine for centuries. According to Charaka Samhita, Ashwagandha is classified under Balya (strength promoting) and Brimhaniya (nourishing) groups of herbs. Recent studies have demonstrated that Withania somnifera root extract significantly reduces serum cortisol levels and improves stress resilience in human subjects. The root contains withanolides, alkaloids and saponins which are responsible for its pharmacological activity. Daily supplementation of 300mg of root extract over 60 days attenuated cortisol levels in stressed adults by approximately 27.9% compared to placebo. Triphala, a combination of Amalaki, Bibhitaki and Haritaki, is another classical formulation that has shown antioxidant properties in multiple in vitro studies.`
 
